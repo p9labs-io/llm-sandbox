@@ -13,25 +13,37 @@ CLAUDE_CREDS := $(HOME)/.claude/.credentials.json
 ENV_FILE     := $(HOME)/.env.ai-cli
 PROJECT      ?= $(shell pwd)
 
-.PHONY: help setup setup-claude-oauth setup-claude-key setup-claude setup-gemini claude gemini
+.PHONY: help setup setup-claude-oauth setup-claude-key setup-claude setup-gemini pull pull-claude pull-gemini claude gemini
 
 help:
 	@echo ""
 	@echo "$(BOLD)llm-sandbox$(RESET)"
 	@echo ""
-	@echo "  Claude auth (pick one):"
-	@echo "  $(CYAN)make setup-claude-oauth$(RESET)  Use claude.ai Pro subscription (recommended)"
-	@echo "  $(CYAN)make setup-claude-key$(RESET)    Use Anthropic API key (console.anthropic.com)"
-	@echo ""
-	@echo "  Gemini auth:"
+	@echo "  First-time setup (run once):"
+	@echo "  $(CYAN)make setup-claude-oauth$(RESET)  Authenticate with claude.ai Pro (recommended)"
+	@echo "  $(CYAN)make setup-claude-key$(RESET)    Save Anthropic API key instead"
 	@echo "  $(CYAN)make setup-gemini$(RESET)        Save Google API key"
 	@echo ""
 	@echo "  Run:"
 	@echo "  $(CYAN)make claude$(RESET)              Run Claude CLI  (PROJECT=projects/my-app)"
 	@echo "  $(CYAN)make gemini$(RESET)              Run Gemini CLI  (PROJECT=projects/my-app)"
 	@echo ""
+	@echo "  Update images:"
+	@echo "  $(CYAN)make pull$(RESET)                Pull latest Claude and Gemini images"
+	@echo "  $(CYAN)make pull-claude$(RESET)         Pull latest Claude image only"
+	@echo "  $(CYAN)make pull-gemini$(RESET)         Pull latest Gemini image only"
+	@echo ""
 
-# ── Setup Claude ───────────────────────────────────────────────────────────────
+# ── Pull ───────────────────────────────────────────────────────────────────────
+pull-claude:
+	docker pull $(CLAUDE_IMAGE)
+
+pull-gemini:
+	docker pull $(GEMINI_IMAGE)
+
+pull: pull-claude pull-gemini
+
+# ── Setup ──────────────────────────────────────────────────────────────────────
 setup-claude-oauth:
 	@echo ""
 	@echo "$(BOLD)Setup — Claude OAuth (Pro plan)$(RESET)"
@@ -40,8 +52,10 @@ setup-claude-oauth:
 		echo "$(GREEN)✓ Credentials found at ~/.claude/.credentials.json$(RESET)"; \
 		echo "  You are ready to run: make claude"; \
 	else \
-		echo "Launching container to authenticate with claude.ai..."; \
-		echo "A browser window will open — log in with your claude.ai account."; \
+		echo "Pulling image..."; \
+		docker pull $(CLAUDE_IMAGE); \
+		echo ""; \
+		echo "Claude will print a login URL — copy it and open it in your browser."; \
 		echo "When done, type /exit inside Claude to close the session."; \
 		echo ""; \
 		mkdir -p $(HOME)/.claude; \
@@ -51,10 +65,9 @@ setup-claude-oauth:
 		if [ -f $(CLAUDE_CREDS) ]; then \
 			chmod 600 $(CLAUDE_CREDS); \
 			echo ""; \
-			echo "$(GREEN)✓ Credentials saved to ~/.claude/.credentials.json$(RESET)"; \
-			echo "  You are ready to run: make claude"; \
+			echo "$(GREEN)✓ Credentials saved. You are ready to run: make claude$(RESET)"; \
 		else \
-			echo "$(YELLOW)Login may not have completed. Try running make setup-claude-oauth again.$(RESET)"; \
+			echo "$(YELLOW)Login may not have completed. Run make setup-claude-oauth again.$(RESET)"; \
 		fi; \
 	fi
 
@@ -71,7 +84,10 @@ setup-claude-key:
 		fi; \
 		chmod 600 $(ENV_FILE); \
 		echo ""; \
-		echo "$(GREEN)✓ Saved to ~/.env.ai-cli$(RESET)"
+		echo "$(GREEN)✓ Saved to ~/.env.ai-cli$(RESET)"; \
+		echo "Pulling image..."; \
+		docker pull $(CLAUDE_IMAGE); \
+		echo "$(GREEN)✓ Ready. Run: make claude$(RESET)"
 
 setup-claude: setup-claude-oauth
 
@@ -88,13 +104,17 @@ setup-gemini:
 		fi; \
 		chmod 600 $(ENV_FILE); \
 		echo ""; \
-		echo "$(GREEN)✓ Saved to ~/.env.ai-cli$(RESET)"
+		echo "$(GREEN)✓ Saved to ~/.env.ai-cli$(RESET)"; \
+		echo "Pulling image..."; \
+		docker pull $(GEMINI_IMAGE); \
+		echo "$(GREEN)✓ Ready. Run: make gemini$(RESET)"
 
 setup: setup-claude-oauth setup-gemini
 
 # ── Run ────────────────────────────────────────────────────────────────────────
 claude:
-	@if [ -f $(CLAUDE_CREDS) ]; then \
+	@docker image inspect $(CLAUDE_IMAGE) > /dev/null 2>&1 || docker pull $(CLAUDE_IMAGE); \
+	if [ -f $(CLAUDE_CREDS) ]; then \
 		echo "$(GREEN)Auth: OAuth (Pro plan)$(RESET)"; \
 		docker run -it --rm \
 			-v "$(PROJECT)":/workspace \
@@ -117,7 +137,8 @@ claude:
 	fi
 
 gemini:
-	@if [ ! -f $(ENV_FILE) ] || ! grep -q '^GOOGLE_API_KEY=' $(ENV_FILE); then \
+	@docker image inspect $(GEMINI_IMAGE) > /dev/null 2>&1 || docker pull $(GEMINI_IMAGE); \
+	if [ ! -f $(ENV_FILE) ] || ! grep -q '^GOOGLE_API_KEY=' $(ENV_FILE); then \
 		echo "No GOOGLE_API_KEY found. Run 'make setup-gemini' first."; exit 1; \
 	fi; \
 	set -a; . $(ENV_FILE); set +a; \

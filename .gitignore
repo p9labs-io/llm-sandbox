@@ -9,3 +9,7 @@
 # Editor
 .vscode/
 .idea/
+
+# Projects
+projects/*
+!projects/.gitkeep
