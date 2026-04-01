@@ -11,6 +11,7 @@ YELLOW := \033[33m
 
 CLAUDE_CREDS := $(HOME)/.claude/.credentials.json
 ENV_FILE     := $(HOME)/.env.ai-cli
+PROJECT      ?= $(shell pwd)
 
 .PHONY: help setup setup-claude-oauth setup-claude-key setup-claude setup-gemini claude gemini
 
@@ -26,8 +27,8 @@ help:
 	@echo "  $(CYAN)make setup-gemini$(RESET)        Save Google API key"
 	@echo ""
 	@echo "  Run:"
-	@echo "  $(CYAN)make claude$(RESET)              Run Claude CLI in current directory"
-	@echo "  $(CYAN)make gemini$(RESET)              Run Gemini CLI in current directory"
+	@echo "  $(CYAN)make claude$(RESET)              Run Claude CLI  (PROJECT=projects/my-app)"
+	@echo "  $(CYAN)make gemini$(RESET)              Run Gemini CLI  (PROJECT=projects/my-app)"
 	@echo ""
 
 # ── Setup Claude ───────────────────────────────────────────────────────────────
@@ -96,14 +97,14 @@ claude:
 	@if [ -f $(CLAUDE_CREDS) ]; then \
 		echo "$(GREEN)Auth: OAuth (Pro plan)$(RESET)"; \
 		docker run -it --rm \
-			-v "$$(pwd)":/workspace \
+			-v "$(PROJECT)":/workspace \
 			-v "$(CLAUDE_CREDS)":/root/.claude/.credentials.json:ro \
 			$(CLAUDE_IMAGE); \
 	elif [ -f $(ENV_FILE) ] && grep -q '^ANTHROPIC_API_KEY=' $(ENV_FILE); then \
 		echo "$(GREEN)Auth: API key$(RESET)"; \
 		set -a; . $(ENV_FILE); set +a; \
 		docker run -it --rm \
-			-v "$$(pwd)":/workspace \
+			-v "$(PROJECT)":/workspace \
 			-e ANTHROPIC_API_KEY="$$ANTHROPIC_API_KEY" \
 			$(CLAUDE_IMAGE); \
 	else \
@@ -121,6 +122,6 @@ gemini:
 	fi; \
 	set -a; . $(ENV_FILE); set +a; \
 	docker run -it --rm \
-		-v "$$(pwd)":/workspace \
+		-v "$(PROJECT)":/workspace \
 		-e GOOGLE_API_KEY="$$GOOGLE_API_KEY" \
 		$(GEMINI_IMAGE)
