@@ -60,7 +60,7 @@ setup-claude-oauth:
 		echo ""; \
 		mkdir -p $(HOME)/.claude; \
 		docker run -it --rm \
-			-v "$(HOME)/.claude":/root/.claude \
+			-v "$(HOME)/.claude":/home/claude/.claude \
 			$(CLAUDE_IMAGE); \
 		if [ -f $(CLAUDE_CREDS) ]; then \
 			chmod 600 $(CLAUDE_CREDS); \
@@ -118,7 +118,7 @@ claude:
 		echo "$(GREEN)Auth: OAuth (Pro plan)$(RESET)"; \
 		docker run -it --rm \
 			-v "$(PROJECT)":/workspace \
-			-v "$(CLAUDE_CREDS)":/root/.claude/.credentials.json:ro \
+			-v "$(CLAUDE_CREDS)":/home/claude/.claude/.credentials.json:ro \
 			$(CLAUDE_IMAGE); \
 	elif [ -f $(ENV_FILE) ] && grep -q '^ANTHROPIC_API_KEY=' $(ENV_FILE); then \
 		echo "$(GREEN)Auth: API key$(RESET)"; \
