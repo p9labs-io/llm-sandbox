@@ -63,16 +63,19 @@ Saves your Google API key from [aistudio.google.com/apikey](https://aistudio.goo
 
 ## Running
 
-All commands are run from the **repo root**. Point them at your project using `PROJECT=`.
+All commands are run from the **repo root**. Point them at your project using `PROJECT=`. Relative paths, absolute paths, and `~` are all supported.
 
 ```bash
-# use a folder inside this repo
+# relative path — resolved automatically
 make claude PROJECT=projects/my-app
 make gemini PROJECT=projects/my-app
 
-# or any folder on your Mac
+# absolute path
+make claude PROJECT=/Users/you/work/client-api
+make gemini PROJECT=/Users/you/work/client-api
+
+# home directory shorthand
 make claude PROJECT=~/work/client-api
-make gemini PROJECT=~/work/client-api
 
 # defaults to current directory if PROJECT is omitted
 make claude
@@ -103,20 +106,20 @@ make pull-gemini   # Gemini only
 
 ## Running without Make
 
-If you prefer plain Docker:
+If you prefer plain Docker, use absolute paths for volume mounts:
 
 **Claude with OAuth:**
 ```bash
 docker run -it --rm \
-  -v ~/work/my-app:/workspace \
-  -v "$HOME/.claude/.credentials.json":/root/.claude/.credentials.json:ro \
+  -v /absolute/path/to/my-app:/workspace \
+  -v "$HOME/.claude/.credentials.json":/home/claude/.claude/.credentials.json:ro \
   ghcr.io/p9labs-io/claude-cli:latest
 ```
 
 **Claude with API key:**
 ```bash
 docker run -it --rm \
-  -v ~/work/my-app:/workspace \
+  -v /absolute/path/to/my-app:/workspace \
   -e ANTHROPIC_API_KEY="your-key-here" \
   ghcr.io/p9labs-io/claude-cli:latest
 ```
@@ -124,7 +127,7 @@ docker run -it --rm \
 **Gemini:**
 ```bash
 docker run -it --rm \
-  -v ~/work/my-app:/workspace \
+  -v /absolute/path/to/my-app:/workspace \
   -e GOOGLE_API_KEY="your-key-here" \
   ghcr.io/p9labs-io/gemini-cli:latest
 ```
@@ -135,7 +138,7 @@ docker run -it --rm \
 |---|---|
 | `-it` | Interactive — keeps the terminal session open |
 | `--rm` | Deletes the container automatically on exit |
-| `-v /your/project:/workspace` | Mounts your project folder into the container |
+| `-v /absolute/path:/workspace` | Mounts your project folder into the container |
 | `:ro` | Read-only — container can read but not modify the file |
 | `-e KEY="..."` | Passes a value as an environment variable |
 
@@ -156,12 +159,12 @@ docker run -it --rm \
 
 ## Images
 
-| Image | Base | Platforms |
-|---|---|---|
-| `ghcr.io/p9labs-io/claude-cli` | `debian:bookworm-slim` | `linux/amd64`, `linux/arm64` |
-| `ghcr.io/p9labs-io/gemini-cli` | `node:20-slim` | `linux/amd64`, `linux/arm64` |
+| Image | Base | Platforms | Runs as |
+|---|---|---|---|
+| `ghcr.io/p9labs-io/claude-cli` | `debian:bookworm-slim` | `linux/amd64`, `linux/arm64` | `claude` (non-root) |
+| `ghcr.io/p9labs-io/gemini-cli` | `node:20-slim` | `linux/amd64`, `linux/arm64` | `node` (non-root) |
 
-Images are published to [GitHub Container Registry](https://github.com/orgs/p9labs-io/packages) and rebuilt automatically only when their Dockerfile changes.
+Both containers run as non-root users. Images are published to [GitHub Container Registry](https://github.com/orgs/p9labs-io/packages) and rebuilt automatically only when their Dockerfile changes.
 
 ---
 
