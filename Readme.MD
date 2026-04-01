@@ -1,148 +1,186 @@
-ORG          := p9labs-io
-REGISTRY     := ghcr.io
-CLAUDE_IMAGE := $(REGISTRY)/$(ORG)/claude-cli:latest
-GEMINI_IMAGE := $(REGISTRY)/$(ORG)/gemini-cli:latest
+# llm-sandbox
 
-BOLD   := \033[1m
-RESET  := \033[0m
-GREEN  := \033[32m
-CYAN   := \033[36m
-YELLOW := \033[33m
+Run [Claude Code](https://claude.ai/code) and [Gemini CLI](https://github.com/google-gemini/gemini-cli) in isolated Docker containers — no runtimes installed on your machine, no access to your home directory, SSH keys, or anything outside the project you point them at.
 
-CLAUDE_CREDS := $(HOME)/.claude/.credentials.json
-ENV_FILE     := $(HOME)/.env.ai-cli
-PROJECT      ?= $(shell pwd)
+## How it works
 
-.PHONY: help setup setup-claude-oauth setup-claude-key setup-claude setup-gemini pull pull-claude pull-gemini claude gemini
+When you launch a tool, only the project folder you specify gets mounted into the container. Everything else on your Mac is invisible to the AI. When the session ends the container is deleted automatically.
 
-help:
-	@echo ""
-	@echo "$(BOLD)llm-sandbox$(RESET)"
-	@echo ""
-	@echo "  First-time setup (run once):"
-	@echo "  $(CYAN)make setup-claude-oauth$(RESET)  Authenticate with claude.ai Pro (recommended)"
-	@echo "  $(CYAN)make setup-claude-key$(RESET)    Save Anthropic API key instead"
-	@echo "  $(CYAN)make setup-gemini$(RESET)        Save Google API key"
-	@echo ""
-	@echo "  Run:"
-	@echo "  $(CYAN)make claude$(RESET)              Run Claude CLI  (PROJECT=projects/my-app)"
-	@echo "  $(CYAN)make gemini$(RESET)              Run Gemini CLI  (PROJECT=projects/my-app)"
-	@echo ""
-	@echo "  Update images:"
-	@echo "  $(CYAN)make pull$(RESET)                Pull latest Claude and Gemini images"
-	@echo "  $(CYAN)make pull-claude$(RESET)         Pull latest Claude image only"
-	@echo "  $(CYAN)make pull-gemini$(RESET)         Pull latest Gemini image only"
-	@echo ""
+```
+your Mac
+└── projects/my-app     ← only this is visible inside the container
+    ├── src/
+    ├── package.json
+    └── ...
+```
 
-# ── Pull ───────────────────────────────────────────────────────────────────────
-pull-claude:
-	docker pull $(CLAUDE_IMAGE)
+---
 
-pull-gemini:
-	docker pull $(GEMINI_IMAGE)
+## Prerequisites
 
-pull: pull-claude pull-gemini
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+- For Claude: a **claude.ai Pro** account — or an **Anthropic API key** from [console.anthropic.com](https://console.anthropic.com)
+- For Gemini: a **Google API key** from [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
-# ── Setup ──────────────────────────────────────────────────────────────────────
-setup-claude-oauth:
-	@echo ""
-	@echo "$(BOLD)Setup — Claude OAuth (Pro plan)$(RESET)"
-	@echo ""
-	@if [ -f $(CLAUDE_CREDS) ]; then \
-		echo "$(GREEN)✓ Credentials found at ~/.claude/.credentials.json$(RESET)"; \
-		echo "  You are ready to run: make claude"; \
-	else \
-		echo "Pulling image..."; \
-		docker pull $(CLAUDE_IMAGE) || { echo ""; echo "$(YELLOW)Failed to pull image. Is the package public? Check github.com/orgs/p9labs-io/packages$(RESET)"; exit 1; }; \
-		echo ""; \
-		echo "Claude will print a login URL — copy it and open it in your browser."; \
-		echo "When done, type /exit inside Claude to close the session."; \
-		echo ""; \
-		mkdir -p $(HOME)/.claude; \
-		docker run -it --rm \
-			-v "$(HOME)/.claude":/root/.claude \
-			$(CLAUDE_IMAGE); \
-		if [ -f $(CLAUDE_CREDS) ]; then \
-			chmod 600 $(CLAUDE_CREDS); \
-			echo ""; \
-			echo "$(GREEN)✓ Credentials saved. You are ready to run: make claude$(RESET)"; \
-		else \
-			echo "$(YELLOW)Login may not have completed. Run make setup-claude-oauth again.$(RESET)"; \
-		fi; \
-	fi
+---
 
-setup-claude-key:
-	@echo ""
-	@echo "$(BOLD)Setup — Anthropic API key$(RESET)"
-	@printf "Anthropic API key (console.anthropic.com/settings/keys): "; \
-		read -r KEY; \
-		touch $(ENV_FILE); \
-		if grep -q '^ANTHROPIC_API_KEY=' $(ENV_FILE) 2>/dev/null; then \
-			sed -i '' 's|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY='"$$KEY"'|' $(ENV_FILE); \
-		else \
-			echo "ANTHROPIC_API_KEY=$$KEY" >> $(ENV_FILE); \
-		fi; \
-		chmod 600 $(ENV_FILE); \
-		echo ""; \
-		echo "$(GREEN)✓ Saved to ~/.env.ai-cli$(RESET)"; \
-		echo "Pulling image..."; \
-		docker pull $(CLAUDE_IMAGE) || { echo ""; echo "$(YELLOW)Failed to pull image. Is the package public? Check github.com/orgs/p9labs-io/packages$(RESET)"; exit 1; }; \
-		echo "$(GREEN)✓ Ready. Run: make claude$(RESET)"
+## Setup
 
-setup-claude: setup-claude-oauth
+Clone the repo. All `make` commands must be run from the repo root.
 
-setup-gemini:
-	@echo ""
-	@echo "$(BOLD)Setup — Google API key$(RESET)"
-	@printf "Google API key (aistudio.google.com/apikey): "; \
-		read -r KEY; \
-		touch $(ENV_FILE); \
-		if grep -q '^GOOGLE_API_KEY=' $(ENV_FILE) 2>/dev/null; then \
-			sed -i '' 's|^GOOGLE_API_KEY=.*|GOOGLE_API_KEY='"$$KEY"'|' $(ENV_FILE); \
-		else \
-			echo "GOOGLE_API_KEY=$$KEY" >> $(ENV_FILE); \
-		fi; \
-		chmod 600 $(ENV_FILE); \
-		echo ""; \
-		echo "$(GREEN)✓ Saved to ~/.env.ai-cli$(RESET)"; \
-		echo "Pulling image..."; \
-		docker pull $(GEMINI_IMAGE); \
-		echo "$(GREEN)✓ Ready. Run: make gemini$(RESET)"
+```bash
+git clone https://github.com/p9labs-io/llm-sandbox.git
+cd llm-sandbox
+```
 
-setup: setup-claude-oauth setup-gemini
+### Claude — Option A: claude.ai Pro (OAuth) — recommended
 
-# ── Run ────────────────────────────────────────────────────────────────────────
-claude:
-	@docker image inspect $(CLAUDE_IMAGE) > /dev/null 2>&1 || docker pull $(CLAUDE_IMAGE); \
-	if [ -f $(CLAUDE_CREDS) ]; then \
-		echo "$(GREEN)Auth: OAuth (Pro plan)$(RESET)"; \
-		docker run -it --rm \
-			-v "$(PROJECT)":/workspace \
-			-v "$(CLAUDE_CREDS)":/root/.claude/.credentials.json:ro \
-			$(CLAUDE_IMAGE); \
-	elif [ -f $(ENV_FILE) ] && grep -q '^ANTHROPIC_API_KEY=' $(ENV_FILE); then \
-		echo "$(GREEN)Auth: API key$(RESET)"; \
-		set -a; . $(ENV_FILE); set +a; \
-		docker run -it --rm \
-			-v "$(PROJECT)":/workspace \
-			-e ANTHROPIC_API_KEY="$$ANTHROPIC_API_KEY" \
-			$(CLAUDE_IMAGE); \
-	else \
-		echo ""; \
-		echo "No Claude credentials found. Run one of:"; \
-		echo "  make setup-claude-oauth   (Pro plan)"; \
-		echo "  make setup-claude-key     (API key)"; \
-		echo ""; \
-		exit 1; \
-	fi
+Runs once. Pulls the image, then Claude prints a login URL in the terminal — copy it and open it in your browser. After logging in, type `/exit` to close the session. Your credentials are saved to `~/.claude/.credentials.json` and reused on every subsequent run, read-only.
 
-gemini:
-	@docker image inspect $(GEMINI_IMAGE) > /dev/null 2>&1 || docker pull $(GEMINI_IMAGE); \
-	if [ ! -f $(ENV_FILE) ] || ! grep -q '^GOOGLE_API_KEY=' $(ENV_FILE); then \
-		echo "No GOOGLE_API_KEY found. Run 'make setup-gemini' first."; exit 1; \
-	fi; \
-	set -a; . $(ENV_FILE); set +a; \
-	docker run -it --rm \
-		-v "$(PROJECT)":/workspace \
-		-e GOOGLE_API_KEY="$$GOOGLE_API_KEY" \
-		$(GEMINI_IMAGE)
+```bash
+make setup-claude-oauth
+```
+
+### Claude — Option B: Anthropic API key
+
+If you don't have a Pro plan, use a pay-per-token API key from [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys). Billed separately from claude.ai.
+
+```bash
+make setup-claude-key
+```
+
+Saves your key and pulls the image automatically.
+
+### Gemini
+
+```bash
+make setup-gemini
+```
+
+Saves your Google API key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) and pulls the image automatically.
+
+---
+
+## Running
+
+All commands are run from the **repo root**. Point them at your project using `PROJECT=`.
+
+```bash
+# use a folder inside this repo
+make claude PROJECT=projects/my-app
+make gemini PROJECT=projects/my-app
+
+# or any folder on your Mac
+make claude PROJECT=~/work/client-api
+make gemini PROJECT=~/work/client-api
+
+# defaults to current directory if PROJECT is omitted
+make claude
+make gemini
+```
+
+If the image isn't available locally, it will be pulled automatically before starting.
+
+### How `make claude` picks auth
+
+It checks in this order and uses whichever is found first:
+
+1. `~/.claude/.credentials.json` exists → OAuth (Pro plan)
+2. `ANTHROPIC_API_KEY` in `~/.env.ai-cli` → API key
+3. Neither found → error with setup instructions
+
+### Updating images
+
+When new versions are released, pull the latest:
+
+```bash
+make pull          # both images
+make pull-claude   # Claude only
+make pull-gemini   # Gemini only
+```
+
+---
+
+## Running without Make
+
+If you prefer plain Docker:
+
+**Claude with OAuth:**
+```bash
+docker run -it --rm \
+  -v ~/work/my-app:/workspace \
+  -v "$HOME/.claude/.credentials.json":/root/.claude/.credentials.json:ro \
+  ghcr.io/p9labs-io/claude-cli:latest
+```
+
+**Claude with API key:**
+```bash
+docker run -it --rm \
+  -v ~/work/my-app:/workspace \
+  -e ANTHROPIC_API_KEY="your-key-here" \
+  ghcr.io/p9labs-io/claude-cli:latest
+```
+
+**Gemini:**
+```bash
+docker run -it --rm \
+  -v ~/work/my-app:/workspace \
+  -e GOOGLE_API_KEY="your-key-here" \
+  ghcr.io/p9labs-io/gemini-cli:latest
+```
+
+### What each flag does
+
+| Flag | Meaning |
+|---|---|
+| `-it` | Interactive — keeps the terminal session open |
+| `--rm` | Deletes the container automatically on exit |
+| `-v /your/project:/workspace` | Mounts your project folder into the container |
+| `:ro` | Read-only — container can read but not modify the file |
+| `-e KEY="..."` | Passes a value as an environment variable |
+
+---
+
+## What the AI can and cannot access
+
+| Resource | Accessible |
+|---|---|
+| The project folder you specify | ✅ Yes |
+| Any other folder on your Mac | ❌ No |
+| `~/.ssh` | ❌ No |
+| `~/Documents`, `~/Downloads` | ❌ No |
+| Your environment variables | ❌ No (only what you pass explicitly) |
+| Your claude.ai credentials (OAuth) | ✅ Read-only, auth only |
+
+---
+
+## Images
+
+| Image | Base | Platforms |
+|---|---|---|
+| `ghcr.io/p9labs-io/claude-cli` | `debian:bookworm-slim` | `linux/amd64`, `linux/arm64` |
+| `ghcr.io/p9labs-io/gemini-cli` | `node:20-slim` | `linux/amd64`, `linux/arm64` |
+
+Images are published to [GitHub Container Registry](https://github.com/orgs/p9labs-io/packages) and rebuilt automatically only when their Dockerfile changes.
+
+---
+
+## Troubleshooting
+
+**`make` says "No such file or directory"**
+You are not in the repo root. `cd` into the `llm-sandbox` folder first.
+
+**`make setup-claude-oauth` says login may not have completed**
+Make sure you finished the browser login before typing `/exit`. Run `make setup-claude-oauth` again.
+
+**`make claude` says "No Claude credentials found"**
+Run either `make setup-claude-oauth` (Pro) or `make setup-claude-key` (API key).
+
+**`make gemini` says "No GOOGLE_API_KEY found"**
+Run `make setup-gemini` to save your key.
+
+**The container starts but asks me to log in again**
+Your OAuth session may have expired. Run `make setup-claude-oauth` to re-authenticate.
+
+**I want to use the latest image version**
+Run `make pull` to pull the latest images from the registry.

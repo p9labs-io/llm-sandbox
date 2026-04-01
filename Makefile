@@ -53,7 +53,7 @@ setup-claude-oauth:
 		echo "  You are ready to run: make claude"; \
 	else \
 		echo "Pulling image..."; \
-		docker pull $(CLAUDE_IMAGE); \
+		docker pull $(CLAUDE_IMAGE) || { echo ""; echo "$(YELLOW)Failed to pull image. Is the package public? Check github.com/orgs/p9labs-io/packages$(RESET)"; exit 1; }; \
 		echo ""; \
 		echo "Claude will print a login URL — copy it and open it in your browser."; \
 		echo "When done, type /exit inside Claude to close the session."; \
@@ -86,7 +86,7 @@ setup-claude-key:
 		echo ""; \
 		echo "$(GREEN)✓ Saved to ~/.env.ai-cli$(RESET)"; \
 		echo "Pulling image..."; \
-		docker pull $(CLAUDE_IMAGE); \
+		docker pull $(CLAUDE_IMAGE) || { echo ""; echo "$(YELLOW)Failed to pull image. Is the package public? Check github.com/orgs/p9labs-io/packages$(RESET)"; exit 1; }; \
 		echo "$(GREEN)✓ Ready. Run: make claude$(RESET)"
 
 setup-claude: setup-claude-oauth
