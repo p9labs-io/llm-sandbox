@@ -14,44 +14,62 @@ your machine
     └── ...
 ```
 
+---
+
 ## Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
-- An **Anthropic API key** for Claude → [console.anthropic.com](https://console.anthropic.com)
-- A **Google API key** for Gemini → [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-
-You only need the key for the tool(s) you plan to use.
+- For Claude: a **claude.ai Pro** account — or an **Anthropic API key** from [console.anthropic.com](https://console.anthropic.com)
+- For Gemini: a **Google API key** from [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
 ---
 
-## Quick start
+## Quick start — Claude
 
-### 1. Save your API key(s)
+Claude supports two authentication methods. OAuth is recommended if you have a Pro plan — no extra cost, no separate billing.
 
-Set up only the tool you need:
+### Option A: claude.ai Pro (OAuth) — recommended
 
+Authenticates inside the container on first run. Credentials are saved to `~/.claude/.credentials.json` on your machine and reused on every subsequent run — read-only, so the container can never modify or rotate them.
+
+**Step 1** — Authenticate (once):
 ```bash
-make setup-claude   # Anthropic key only
-make setup-gemini   # Google key only
-make setup          # both
+make setup-claude-oauth
 ```
 
-Keys are saved to `~/.env.ai-cli` on your machinehine — readable only by you, never committed to git. Running setup again for the same tool overwrites just that key, leaving the other untouched.
+This launches a container, opens a browser for you to log in with your claude.ai account, then saves the credentials to your machine. No native Claude Code install needed.
 
-### 2. Go to your project
-
+**Step 2** — Go to your project and run:
 ```bash
 cd ~/projects/my-app
+make claude
 ```
 
-### 3. Run the CLI
+### Option B: Anthropic API key
+
+If you don't have a Pro plan, you can use a pay-per-token API key from [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys). Note this is billed separately from claude.ai Pro.
 
 ```bash
-make claude   # start Claude Code
-make gemini   # start Gemini CLI
+make setup-claude-key
 ```
 
-That's it. The tool starts inside a container with your current folder mounted at `/workspace`.
+### How `make claude` picks auth
+
+It checks in this order and uses whichever is available first:
+
+1. `~/.claude/.credentials.json` (OAuth) — prints `Auth: OAuth (Pro plan)`
+2. `ANTHROPIC_API_KEY` in `~/.env.ai-cli` — prints `Auth: API key`
+3. Neither found → error with setup instructions
+
+---
+
+## Quick start — Gemini
+
+```bash
+make setup-gemini   # save your Google API key (once)
+cd ~/projects/my-app
+make gemini
+```
 
 ---
 
@@ -59,7 +77,15 @@ That's it. The tool starts inside a container with your current folder mounted a
 
 If you prefer plain Docker:
 
-**Claude:**
+**Claude with OAuth:**
+```bash
+docker run -it --rm \
+  -v "$(pwd)":/workspace \
+  -v "$HOME/.claude/.credentials.json":/root/.claude/.credentials.json:ro \
+  ghcr.io/p9labs-io/claude-cli:latest
+```
+
+**Claude with API key:**
 ```bash
 docker run -it --rm \
   -v "$(pwd)":/workspace \
@@ -82,7 +108,8 @@ docker run -it --rm \
 | `-it` | Interactive mode — keeps the terminal session open |
 | `--rm` | Deletes the container automatically when you exit |
 | `-v "$(pwd)":/workspace` | Mounts your current folder into the container |
-| `-e KEY="..."` | Passes your API key as an environment variable |
+| `:ro` | Read-only — container can read but not modify the file |
+| `-e KEY="..."` | Passes a value as an environment variable |
 
 ---
 
@@ -94,9 +121,8 @@ docker run -it --rm \
 | Any other folder on your machine | ❌ No |
 | `~/.ssh` | ❌ No |
 | `~/Documents`, `~/Downloads` | ❌ No |
-| Your environment variables | ❌ No (only the key you pass explicitly) |
-
-The container has no knowledge of anything outside the folder you mount.
+| Your environment variables | ❌ No (only what you pass explicitly) |
+| Your claude.ai credentials (OAuth) | ✅ Read-only, auth only |
 
 ---
 
@@ -107,27 +133,27 @@ The container has no knowledge of anything outside the folder you mount.
 | `ghcr.io/p9labs-io/claude-cli` | `debian:bookworm-slim` | Native binary, no Node.js required |
 | `ghcr.io/p9labs-io/gemini-cli` | `node:20-slim` | Requires Node.js — Google hasn't released a native binary yet |
 
-Images are built automatically on every push to `main` and published to [GitHub Container Registry](https://github.com/orgs/p9labs-io/packages).
+Images are published to [GitHub Container Registry](https://github.com/orgs/p9labs-io/packages) and rebuilt automatically only when their Dockerfile changes.
 
 ---
 
 ## Troubleshooting
 
-**`make claude` says "No ANTHROPIC_API_KEY found"**
-Run `make setup-claude` to save your key.
+**`make setup-claude-oauth` says login may not have completed**
+Make sure you completed the browser login before typing `/exit` in the container. Run `make setup-claude-oauth` again.
+
+**`make claude` says "No Claude credentials found"**
+Run either `make setup-claude-oauth` (Pro) or `make setup-claude-key` (API key).
 
 **`make gemini` says "No GOOGLE_API_KEY found"**
 Run `make setup-gemini` to save your key.
 
 **Docker says "image not found"**
-Make sure Docker Desktop is running, then try pulling manually:
+Make sure Docker Desktop is running, then pull manually:
 ```bash
 docker pull ghcr.io/p9labs-io/claude-cli:latest
 docker pull ghcr.io/p9labs-io/gemini-cli:latest
 ```
 
-**The container starts but the CLI asks me to log in**
-Your API key may be invalid or expired. Double-check it and re-run the relevant setup command.
-
 **I want to use a specific subfolder, not my whole project**
-Just `cd` into that subfolder before running `make claude` or `make gemini`. Only that directory will be mounted.
+`cd` into that subfolder before running `make claude` or `make gemini`. Only that directory will be mounted.
