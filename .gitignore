@@ -1,0 +1,11 @@
+# API tokens — should never be in the repo
+.env
+.env.*
+.env.ai-cli
+
+# macOS noise
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
