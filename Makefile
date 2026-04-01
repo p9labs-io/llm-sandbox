@@ -98,10 +98,10 @@ setup-gemini:
 	@printf "Google API key (aistudio.google.com/apikey): "; \
 		read -r KEY; \
 		touch $(ENV_FILE); \
-		if grep -q '^GOOGLE_API_KEY=' $(ENV_FILE) 2>/dev/null; then \
-			sed -i '' 's|^GOOGLE_API_KEY=.*|GOOGLE_API_KEY='"$$KEY"'|' $(ENV_FILE); \
+		if grep -q '^GEMINI_API_KEY=' $(ENV_FILE) 2>/dev/null; then \
+			sed -i '' 's|^GEMINI_API_KEY=.*|GEMINI_API_KEY='"$$KEY"'|' $(ENV_FILE); \
 		else \
-			echo "GOOGLE_API_KEY=$$KEY" >> $(ENV_FILE); \
+			echo "GEMINI_API_KEY=$$KEY" >> $(ENV_FILE); \
 		fi; \
 		chmod 600 $(ENV_FILE); \
 		echo ""; \
@@ -139,11 +139,11 @@ claude:
 
 gemini:
 	@docker image inspect $(GEMINI_IMAGE) > /dev/null 2>&1 || docker pull $(GEMINI_IMAGE); \
-	if [ ! -f $(ENV_FILE) ] || ! grep -q '^GOOGLE_API_KEY=' $(ENV_FILE); then \
-		echo "No GOOGLE_API_KEY found. Run 'make setup-gemini' first."; exit 1; \
+	if [ ! -f $(ENV_FILE) ] || ! grep -q '^GEMINI_API_KEY=' $(ENV_FILE); then \
+		echo "No GEMINI_API_KEY found. Run 'make setup-gemini' first."; exit 1; \
 	fi; \
 	set -a; . $(ENV_FILE); set +a; \
 	docker run -it --rm \
 		-v "$(ABS_PROJECT)":/workspace \
-		-e GOOGLE_API_KEY="$$GOOGLE_API_KEY" \
+		-e GEMINI_API_KEY="$$GEMINI_API_KEY" \
 		$(GEMINI_IMAGE)

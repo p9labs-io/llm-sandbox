@@ -6,7 +6,7 @@ RUN npm install -g @google/gemini-cli \
 USER node
 
 RUN mkdir -p /home/node/.gemini && \
-    echo '{"selectedAuthType":"gemini-api-key"}' > /home/node/.gemini/settings.json
+    echo '{"security":{"auth":{"selectedType":"gemini-api-key"}}}' > /home/node/.gemini/settings.json
 
 WORKDIR /workspace
 
