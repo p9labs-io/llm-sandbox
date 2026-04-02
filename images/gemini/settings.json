@@ -1,7 +1,4 @@
 {
   "security": {"auth": {"selectedType": "gemini-api-key"}},
-  "general": {"autoUpdate": false},
-  "tools": {
-    "exclude": ["google_web_search"]
-  }
+  "general": {"autoUpdate": false}
 }

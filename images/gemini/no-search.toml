@@ -1,0 +1,5 @@
+[[rule]]
+toolName = "google_web_search"
+decision = "deny"
+priority = 999
+denyMessage = "Web search is disabled in this environment."
