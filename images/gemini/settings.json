@@ -1,22 +1,7 @@
 {
   "security": {"auth": {"selectedType": "gemini-api-key"}},
   "general": {"autoUpdate": false},
-  "coreTools": [
-    "glob",
-    "grep_search",
-    "list_directory",
-    "read_file",
-    "run_shell_command",
-    "write_file",
-    "replace",
-    "write_todos",
-    "web_fetch",
-    "read_many_files",
-    "save_memory",
-    "get_internal_docs",
-    "activate_skill",
-    "ask_user",
-    "exit_plan_mode",
-    "enter_plan_mode"
-  ]
+  "tools": {
+    "exclude": ["google_web_search"]
+  }
 }
