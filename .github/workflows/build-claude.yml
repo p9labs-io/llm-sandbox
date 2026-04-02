@@ -1,6 +1,8 @@
 name: Build and Push Claude CLI
 
 on:
+  schedule:
+    - cron: '0 6 * * 1'  # every Monday at 6am UTC
   push:
     branches: [main]
     paths:
@@ -46,9 +48,10 @@ jobs:
           context: images/claude
           file: images/claude/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.ref == 'refs/heads/main' }}
+          push: ${{ github.ref == 'refs/heads/main' || github.event_name == 'schedule' }}
           tags: |
             ghcr.io/${{ env.ORG }}/claude-cli:latest
             ghcr.io/${{ env.ORG }}/claude-cli:${{ github.sha }}
+          no-cache: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
