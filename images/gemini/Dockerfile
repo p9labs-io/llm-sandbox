@@ -5,11 +5,8 @@ RUN npm install -g @google/gemini-cli \
 
 USER node
 
-RUN mkdir -p /home/node/.gemini && \
-    echo '{
-  "security": {"auth": {"selectedType": "gemini-api-key"}},
-  "coreTools": ["ReadFileTool", "WriteFileTool", "EditTool", "GlobTool", "SearchFileTool", "ShellTool", "WebFetchTool", "MemoryTool"]
-}' > /home/node/.gemini/settings.json
+RUN mkdir -p /home/node/.gemini
+COPY --chown=node:node settings.json /home/node/.gemini/settings.json
 
 WORKDIR /workspace
 

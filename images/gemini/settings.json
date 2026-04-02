@@ -1,0 +1,4 @@
+{
+  "security": {"auth": {"selectedType": "gemini-api-key"}},
+  "coreTools": ["ReadFileTool", "WriteFileTool", "EditTool", "GlobTool", "SearchFileTool", "ShellTool", "WebFetchTool", "MemoryTool"]
+}
