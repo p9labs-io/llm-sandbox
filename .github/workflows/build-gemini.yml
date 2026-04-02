@@ -4,11 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - images/gemini/Dockerfile
+      - images/gemini/**
   pull_request:
     branches: [main]
     paths:
-      - images/gemini/Dockerfile
+      - images/gemini/**
   workflow_dispatch:
 
 env:

@@ -4,11 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - images/claude/Dockerfile
+      - images/claude/**
   pull_request:
     branches: [main]
     paths:
-      - images/claude/Dockerfile
+      - images/claude/**
   workflow_dispatch:
 
 env:
