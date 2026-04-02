@@ -183,7 +183,7 @@ Run either `make setup-claude-oauth` (Pro) or `make setup-claude-key` (API key).
 Run `make setup-gemini` to save your key.
 
 **The container starts but asks me to log in again**
-Your OAuth session may have expired. Run `make setup-claude-oauth` to re-authenticate.
+`make claude` automatically detects an expired OAuth token and re-authenticates before launching. If you see a 401 error mid-session, exit the container and run `make claude` again — it will handle re-auth automatically.
 
 **I want to use the latest image version**
 Run `make pull` to pull the latest images from the registry.

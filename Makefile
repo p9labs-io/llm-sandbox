@@ -12,7 +12,7 @@ YELLOW := \033[33m
 CLAUDE_CREDS := $(HOME)/.claude/.credentials.json
 ENV_FILE     := $(HOME)/.env.ai-cli
 PROJECT      ?= $(shell pwd)
-ABS_PROJECT  := $(shell realpath $(PROJECT))
+ABS_PROJECT  := $(shell realpath $(PROJECT) 2>/dev/null)
 
 .PHONY: help setup setup-claude-oauth setup-claude-key setup-claude setup-gemini pull pull-claude pull-gemini claude gemini
 
@@ -112,9 +112,28 @@ setup-gemini:
 
 setup: setup-claude-oauth setup-gemini
 
+# ── Helpers ────────────────────────────────────────────────────────────────────
+# Returns 0 if OAuth token is expired or missing, 1 if valid
+_claude_token_expired:
+	@EXPIRES=$$(python3 -c "import json,sys; d=json.load(open('$(CLAUDE_CREDS)')); print(d.get('claudeAiOauth',{}).get('expiresAt',0))" 2>/dev/null); \
+	NOW=$$(python3 -c "import time; print(int(time.time()*1000))"); \
+	[ -z "$$EXPIRES" ] || [ "$$NOW" -ge "$$EXPIRES" ]
+
 # ── Run ────────────────────────────────────────────────────────────────────────
 claude:
-	@docker image inspect $(CLAUDE_IMAGE) > /dev/null 2>&1 || docker pull $(CLAUDE_IMAGE); \
+	@if [ -z "$(ABS_PROJECT)" ]; then \
+		echo ""; echo "$(YELLOW)Project path not found: $(PROJECT)$(RESET)"; echo ""; exit 1; \
+	fi; \
+	docker image inspect $(CLAUDE_IMAGE) > /dev/null 2>&1 || docker pull $(CLAUDE_IMAGE); \
+	if [ -f $(CLAUDE_CREDS) ]; then \
+		EXPIRES=$$(python3 -c "import json; d=json.load(open('$(CLAUDE_CREDS)')); print(d.get('claudeAiOauth',{}).get('expiresAt',0))" 2>/dev/null); \
+		NOW=$$(python3 -c "import time; print(int(time.time()*1000))"); \
+		if [ -n "$$EXPIRES" ] && [ "$$NOW" -ge "$$EXPIRES" ]; then \
+			echo "$(YELLOW)OAuth token expired. Re-authenticating...$(RESET)"; \
+			rm -f $(CLAUDE_CREDS); \
+			$(MAKE) setup-claude-oauth; \
+		fi; \
+	fi; \
 	if [ -f $(CLAUDE_CREDS) ]; then \
 		echo "$(GREEN)Auth: OAuth (Pro plan)$(RESET)"; \
 		docker run -it --rm \
@@ -138,7 +157,10 @@ claude:
 	fi
 
 gemini:
-	@docker image inspect $(GEMINI_IMAGE) > /dev/null 2>&1 || docker pull $(GEMINI_IMAGE); \
+	@if [ -z "$(ABS_PROJECT)" ]; then \
+		echo ""; echo "$(YELLOW)Project path not found: $(PROJECT)$(RESET)"; echo ""; exit 1; \
+	fi; \
+	docker image inspect $(GEMINI_IMAGE) > /dev/null 2>&1 || docker pull $(GEMINI_IMAGE); \
 	if [ ! -f $(ENV_FILE) ] || ! grep -q '^GEMINI_API_KEY=' $(ENV_FILE); then \
 		echo "No GEMINI_API_KEY found. Run 'make setup-gemini' first."; exit 1; \
 	fi; \
