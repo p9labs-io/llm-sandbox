@@ -1,7 +1,7 @@
-ORG          := p9labs-io
-REGISTRY     := ghcr.io
-CLAUDE_IMAGE := $(REGISTRY)/$(ORG)/claude-cli:latest
-GEMINI_IMAGE := $(REGISTRY)/$(ORG)/gemini-cli:latest
+ORG               := p9labs-io
+REGISTRY          := ghcr.io
+CLAUDE_IMAGE      := $(REGISTRY)/$(ORG)/claude-cli:latest
+ANTIGRAVITY_IMAGE := $(REGISTRY)/$(ORG)/antigravity-cli:latest
 
 BOLD   := \033[1m
 RESET  := \033[0m
@@ -14,7 +14,7 @@ ENV_FILE     := $(HOME)/.env.ai-cli
 PROJECT      ?= $(shell pwd)
 ABS_PROJECT  := $(shell realpath $(PROJECT) 2>/dev/null)
 
-.PHONY: help setup setup-claude-oauth setup-claude-key setup-claude setup-gemini pull pull-claude pull-gemini claude gemini
+.PHONY: help setup setup-claude-oauth setup-claude-key setup-claude setup-antigravity pull pull-claude pull-antigravity claude antigravity agy
 
 help:
 	@echo ""
@@ -23,26 +23,27 @@ help:
 	@echo "  First-time setup (run once):"
 	@echo "  $(CYAN)make setup-claude-oauth$(RESET)  Authenticate with claude.ai Pro (recommended)"
 	@echo "  $(CYAN)make setup-claude-key$(RESET)    Save Anthropic API key instead"
-	@echo "  $(CYAN)make setup-gemini$(RESET)        Save Google API key"
+	@echo "  $(CYAN)make setup-antigravity$(RESET)   Save Antigravity API key"
 	@echo ""
 	@echo "  Run:"
-	@echo "  $(CYAN)make claude$(RESET)              Run Claude CLI  (PROJECT=projects/my-app)"
-	@echo "  $(CYAN)make gemini$(RESET)              Run Gemini CLI  (PROJECT=projects/my-app)"
+	@echo "  $(CYAN)make claude$(RESET)              Run Claude CLI       (PROJECT=projects/my-app)"
+	@echo "  $(CYAN)make antigravity$(RESET)           Run Antigravity CLI  (PROJECT=projects/my-app)"
+	@echo "  $(CYAN)make agy$(RESET)                 Alias for make antigravity"
 	@echo ""
 	@echo "  Update images:"
-	@echo "  $(CYAN)make pull$(RESET)                Pull latest Claude and Gemini images"
+	@echo "  $(CYAN)make pull$(RESET)                Pull latest Claude and Antigravity images"
 	@echo "  $(CYAN)make pull-claude$(RESET)         Pull latest Claude image only"
-	@echo "  $(CYAN)make pull-gemini$(RESET)         Pull latest Gemini image only"
+	@echo "  $(CYAN)make pull-antigravity$(RESET)    Pull latest Antigravity image only"
 	@echo ""
 
 # ── Pull ───────────────────────────────────────────────────────────────────────
 pull-claude:
 	docker pull $(CLAUDE_IMAGE)
 
-pull-gemini:
-	docker pull $(GEMINI_IMAGE)
+pull-antigravity:
+	docker pull $(ANTIGRAVITY_IMAGE)
 
-pull: pull-claude pull-gemini
+pull: pull-claude pull-antigravity
 
 # ── Setup ──────────────────────────────────────────────────────────────────────
 setup-claude-oauth:
@@ -78,11 +79,9 @@ setup-claude-key:
 	@printf "Anthropic API key (console.anthropic.com/settings/keys): "; \
 		read -r KEY; \
 		touch $(ENV_FILE); \
-		if grep -q '^ANTHROPIC_API_KEY=' $(ENV_FILE) 2>/dev/null; then \
-			sed -i '' 's|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY='"$$KEY"'|' $(ENV_FILE); \
-		else \
-			echo "ANTHROPIC_API_KEY=$$KEY" >> $(ENV_FILE); \
-		fi; \
+		grep -v '^ANTHROPIC_API_KEY=' $(ENV_FILE) > $(ENV_FILE).tmp 2>/dev/null || true; \
+		echo "ANTHROPIC_API_KEY=$$KEY" >> $(ENV_FILE).tmp; \
+		mv $(ENV_FILE).tmp $(ENV_FILE); \
 		chmod 600 $(ENV_FILE); \
 		echo ""; \
 		echo "$(GREEN)✓ Saved to ~/.env.ai-cli$(RESET)"; \
@@ -92,25 +91,23 @@ setup-claude-key:
 
 setup-claude: setup-claude-oauth
 
-setup-gemini:
+setup-antigravity:
 	@echo ""
-	@echo "$(BOLD)Setup — Google API key$(RESET)"
-	@printf "Google API key (aistudio.google.com/apikey): "; \
+	@echo "$(BOLD)Setup — Antigravity API key$(RESET)"
+	@printf "Antigravity API key (antigravity.google/docs/cli/reference): "; \
 		read -r KEY; \
 		touch $(ENV_FILE); \
-		if grep -q '^GEMINI_API_KEY=' $(ENV_FILE) 2>/dev/null; then \
-			sed -i '' 's|^GEMINI_API_KEY=.*|GEMINI_API_KEY='"$$KEY"'|' $(ENV_FILE); \
-		else \
-			echo "GEMINI_API_KEY=$$KEY" >> $(ENV_FILE); \
-		fi; \
+		grep -v '^ANTIGRAVITY_API_KEY=' $(ENV_FILE) > $(ENV_FILE).tmp 2>/dev/null || true; \
+		echo "ANTIGRAVITY_API_KEY=$$KEY" >> $(ENV_FILE).tmp; \
+		mv $(ENV_FILE).tmp $(ENV_FILE); \
 		chmod 600 $(ENV_FILE); \
 		echo ""; \
 		echo "$(GREEN)✓ Saved to ~/.env.ai-cli$(RESET)"; \
 		echo "Pulling image..."; \
-		docker pull $(GEMINI_IMAGE); \
-		echo "$(GREEN)✓ Ready. Run: make gemini$(RESET)"
+		docker pull $(ANTIGRAVITY_IMAGE); \
+		echo "$(GREEN)✓ Ready. Run: make antigravity$(RESET)"
 
-setup: setup-claude-oauth setup-gemini
+setup: setup-claude-oauth setup-antigravity
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 # Returns 0 if OAuth token is expired or missing, 1 if valid
@@ -156,16 +153,18 @@ claude:
 		exit 1; \
 	fi
 
-gemini:
+antigravity:
 	@if [ -z "$(ABS_PROJECT)" ]; then \
 		echo ""; echo "$(YELLOW)Project path not found: $(PROJECT)$(RESET)"; echo ""; exit 1; \
 	fi; \
-	docker image inspect $(GEMINI_IMAGE) > /dev/null 2>&1 || docker pull $(GEMINI_IMAGE); \
-	if [ ! -f $(ENV_FILE) ] || ! grep -q '^GEMINI_API_KEY=' $(ENV_FILE); then \
-		echo "No GEMINI_API_KEY found. Run 'make setup-gemini' first."; exit 1; \
+	docker image inspect $(ANTIGRAVITY_IMAGE) > /dev/null 2>&1 || docker pull $(ANTIGRAVITY_IMAGE); \
+	if [ ! -f $(ENV_FILE) ] || ! grep -q '^ANTIGRAVITY_API_KEY=' $(ENV_FILE); then \
+		echo "No ANTIGRAVITY_API_KEY found. Run 'make setup-antigravity' first."; exit 1; \
 	fi; \
 	set -a; . $(ENV_FILE); set +a; \
 	docker run -it --rm \
 		-v "$(ABS_PROJECT)":/workspace \
-		-e GEMINI_API_KEY="$$GEMINI_API_KEY" \
-		$(GEMINI_IMAGE)
+		-e ANTIGRAVITY_API_KEY="$$ANTIGRAVITY_API_KEY" \
+		$(ANTIGRAVITY_IMAGE)
+
+agy: antigravity

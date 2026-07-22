@@ -1,4 +1,4 @@
-name: Build and Push Gemini CLI
+name: Build and Push Antigravity CLI
 
 on:
   schedule:
@@ -6,11 +6,11 @@ on:
   push:
     branches: [main]
     paths:
-      - images/gemini/**
+      - images/antigravity/**
   pull_request:
     branches: [main]
     paths:
-      - images/gemini/**
+      - images/antigravity/**
   workflow_dispatch:
 
 env:
@@ -19,7 +19,7 @@ env:
 
 jobs:
   build:
-    name: Gemini CLI
+    name: Antigravity CLI
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -45,13 +45,13 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: images/gemini
-          file: images/gemini/Dockerfile
+          context: images/antigravity
+          file: images/antigravity/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ github.ref == 'refs/heads/main' || github.event_name == 'schedule' }}
           tags: |
-            ghcr.io/${{ env.ORG }}/gemini-cli:latest
-            ghcr.io/${{ env.ORG }}/gemini-cli:${{ github.sha }}
+            ghcr.io/${{ env.ORG }}/antigravity-cli:latest
+            ghcr.io/${{ env.ORG }}/antigravity-cli:${{ github.sha }}
           no-cache: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
