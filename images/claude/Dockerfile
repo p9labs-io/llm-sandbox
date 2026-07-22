@@ -1,5 +1,7 @@
 FROM debian:bookworm-slim
 
+LABEL org.opencontainers.image.source="https://github.com/p9labs-io/llm-sandbox"
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
