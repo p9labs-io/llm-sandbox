@@ -14,19 +14,21 @@ ENV_FILE     := $(HOME)/.env.ai-cli
 PROJECT      ?= $(shell pwd)
 ABS_PROJECT  := $(shell realpath $(PROJECT) 2>/dev/null)
 
-.PHONY: help setup setup-claude-oauth setup-claude-key setup-claude setup-antigravity pull pull-claude pull-antigravity claude antigravity agy
+.PHONY: help setup setup-claude-oauth setup-claude-key setup-claude setup-antigravity pull pull-claude pull-antigravity claude claude-oauth claude-key antigravity agy
 
 help:
 	@echo ""
 	@echo "$(BOLD)llm-sandbox$(RESET)"
 	@echo ""
 	@echo "  First-time setup (run once):"
-	@echo "  $(CYAN)make setup-claude-oauth$(RESET)  Authenticate with claude.ai Pro (recommended)"
-	@echo "  $(CYAN)make setup-claude-key$(RESET)    Save Anthropic API key instead"
+	@echo "  $(CYAN)make setup-claude-oauth$(RESET)  Authenticate with claude.ai Pro"
+	@echo "  $(CYAN)make setup-claude-key$(RESET)    Save Anthropic API key (Zero-Trust/Secure)"
 	@echo "  $(CYAN)make setup-antigravity$(RESET)   Save Antigravity API key"
 	@echo ""
 	@echo "  Run:"
-	@echo "  $(CYAN)make claude$(RESET)              Run Claude CLI       (PROJECT=projects/my-app)"
+	@echo "  $(CYAN)make claude$(RESET)              Run Claude CLI (auto-detects auth)"
+	@echo "  $(CYAN)make claude-oauth$(RESET)        Run Claude CLI via OAuth (Pro plan)"
+	@echo "  $(CYAN)make claude-key$(RESET)          Run Claude CLI via API Key (Zero-Trust/Secure)"
 	@echo "  $(CYAN)make antigravity$(RESET)           Run Antigravity CLI  (PROJECT=projects/my-app)"
 	@echo "  $(CYAN)make agy$(RESET)                 Alias for make antigravity"
 	@echo ""
@@ -52,7 +54,7 @@ setup-claude-oauth:
 	@echo ""
 	@if [ -f $(CLAUDE_CREDS) ]; then \
 		echo "$(GREEN)✓ Credentials found at ~/.claude/.credentials.json$(RESET)"; \
-		echo "  You are ready to run: make claude"; \
+		echo "  You are ready to run: make claude-oauth"; \
 	else \
 		echo "Pulling image..."; \
 		docker pull $(CLAUDE_IMAGE) || { echo ""; echo "$(YELLOW)Failed to pull image. Is the package public? Check github.com/orgs/p9labs-io/packages$(RESET)"; exit 1; }; \
@@ -67,7 +69,7 @@ setup-claude-oauth:
 		if [ -f $(CLAUDE_CREDS) ]; then \
 			chmod 600 $(CLAUDE_CREDS); \
 			echo ""; \
-			echo "$(GREEN)✓ Credentials saved. You are ready to run: make claude$(RESET)"; \
+			echo "$(GREEN)✓ Credentials saved. You are ready to run: make claude-oauth$(RESET)"; \
 		else \
 			echo "$(YELLOW)Login may not have completed. Run make setup-claude-oauth again.$(RESET)"; \
 		fi; \
@@ -75,7 +77,7 @@ setup-claude-oauth:
 
 setup-claude-key:
 	@echo ""
-	@echo "$(BOLD)Setup — Anthropic API key$(RESET)"
+	@echo "$(BOLD)Setup — Anthropic API key (Zero-Trust/Secure)$(RESET)"
 	@printf "Anthropic API key (console.anthropic.com/settings/keys): "; \
 		read -r KEY; \
 		touch $(ENV_FILE); \
@@ -87,7 +89,7 @@ setup-claude-key:
 		echo "$(GREEN)✓ Saved to ~/.env.ai-cli$(RESET)"; \
 		echo "Pulling image..."; \
 		docker pull $(CLAUDE_IMAGE) || { echo ""; echo "$(YELLOW)Failed to pull image. Is the package public? Check github.com/orgs/p9labs-io/packages$(RESET)"; exit 1; }; \
-		echo "$(GREEN)✓ Ready. Run: make claude$(RESET)"
+		echo "$(GREEN)✓ Ready. Run: make claude-key$(RESET)"
 
 setup-claude: setup-claude-oauth
 
@@ -117,33 +119,48 @@ _claude_token_expired:
 	[ -z "$$EXPIRES" ] || [ "$$NOW" -ge "$$EXPIRES" ]
 
 # ── Run ────────────────────────────────────────────────────────────────────────
-claude:
+claude-oauth:
 	@if [ -z "$(ABS_PROJECT)" ]; then \
 		echo ""; echo "$(YELLOW)Project path not found: $(PROJECT)$(RESET)"; echo ""; exit 1; \
 	fi; \
 	docker image inspect $(CLAUDE_IMAGE) > /dev/null 2>&1 || docker pull $(CLAUDE_IMAGE); \
-	if [ -f $(CLAUDE_CREDS) ]; then \
-		EXPIRES=$$(python3 -c "import json; d=json.load(open('$(CLAUDE_CREDS)')); print(d.get('claudeAiOauth',{}).get('expiresAt',0))" 2>/dev/null); \
-		NOW=$$(python3 -c "import time; print(int(time.time()*1000))"); \
-		if [ -n "$$EXPIRES" ] && [ "$$NOW" -ge "$$EXPIRES" ]; then \
-			echo "$(YELLOW)OAuth token expired. Re-authenticating...$(RESET)"; \
-			rm -f $(CLAUDE_CREDS); \
-			$(MAKE) setup-claude-oauth; \
-		fi; \
+	if [ ! -f $(CLAUDE_CREDS) ]; then \
+		echo "No Claude OAuth credentials found. Run 'make setup-claude-oauth' first."; exit 1; \
 	fi; \
-	if [ -f $(CLAUDE_CREDS) ]; then \
-		echo "$(GREEN)Auth: OAuth (Pro plan)$(RESET)"; \
-		docker run -it --rm \
-			-v "$(ABS_PROJECT)":/workspace \
-			-v "$(CLAUDE_CREDS)":/home/claude/.claude/.credentials.json:ro \
-			$(CLAUDE_IMAGE); \
+	EXPIRES=$$(python3 -c "import json; d=json.load(open('$(CLAUDE_CREDS)')); print(d.get('claudeAiOauth',{}).get('expiresAt',0))" 2>/dev/null); \
+	NOW=$$(python3 -c "import time; print(int(time.time()*1000))"); \
+	if [ -n "$$EXPIRES" ] && [ "$$NOW" -ge "$$EXPIRES" ]; then \
+		echo "$(YELLOW)OAuth token expired. Re-authenticating...$(RESET)"; \
+		rm -f $(CLAUDE_CREDS); \
+		$(MAKE) setup-claude-oauth; \
+	fi; \
+	echo "$(GREEN)Auth: OAuth (Pro plan) [Note: convenience mode, mounts token file]$(RESET)"; \
+	docker run -it --rm \
+		-v "$(ABS_PROJECT)":/workspace \
+		-v "$(CLAUDE_CREDS)":/home/claude/.claude/.credentials.json:ro \
+		$(CLAUDE_IMAGE)
+
+claude-key:
+	@if [ -z "$(ABS_PROJECT)" ]; then \
+		echo ""; echo "$(YELLOW)Project path not found: $(PROJECT)$(RESET)"; echo ""; exit 1; \
+	fi; \
+	docker image inspect $(CLAUDE_IMAGE) > /dev/null 2>&1 || docker pull $(CLAUDE_IMAGE); \
+	if [ ! -f $(ENV_FILE) ] || ! grep -q '^ANTHROPIC_API_KEY=' $(ENV_FILE); then \
+		echo "No ANTHROPIC_API_KEY found. Run 'make setup-claude-key' first."; exit 1; \
+	fi; \
+	echo "$(GREEN)Auth: API key [Secure/Zero-Trust mode, credentials isolated]$(RESET)"; \
+	set -a; . $(ENV_FILE); set +a; \
+	docker run -it --rm \
+		-v "$(ABS_PROJECT)":/workspace \
+		-e ANTHROPIC_API_KEY="$$ANTHROPIC_API_KEY" \
+		$(CLAUDE_IMAGE)
+
+# Run default Claude CLI (prefers OAuth if available, otherwise falls back to API key)
+claude:
+	@if [ -f $(CLAUDE_CREDS) ]; then \
+		$(MAKE) claude-oauth; \
 	elif [ -f $(ENV_FILE) ] && grep -q '^ANTHROPIC_API_KEY=' $(ENV_FILE); then \
-		echo "$(GREEN)Auth: API key$(RESET)"; \
-		set -a; . $(ENV_FILE); set +a; \
-		docker run -it --rm \
-			-v "$(ABS_PROJECT)":/workspace \
-			-e ANTHROPIC_API_KEY="$$ANTHROPIC_API_KEY" \
-			$(CLAUDE_IMAGE); \
+		$(MAKE) claude-key; \
 	else \
 		echo ""; \
 		echo "No Claude credentials found. Run one of:"; \

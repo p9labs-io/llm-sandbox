@@ -33,7 +33,7 @@ git clone https://github.com/p9labs-io/llm-sandbox.git
 cd llm-sandbox
 ```
 
-### Claude — Option A: claude.ai Pro (OAuth) — recommended
+### Claude — Option A: claude.ai Pro (OAuth) — Recommended for convenience
 
 Runs once. Pulls the image, then Claude prints a login URL in the terminal — copy it and open it in your browser. After logging in, type `/exit` to close the session. Your credentials are saved to `~/.claude/.credentials.json` and reused on every subsequent run, read-only.
 
@@ -41,9 +41,12 @@ Runs once. Pulls the image, then Claude prints a login URL in the terminal — c
 make setup-claude-oauth
 ```
 
-### Claude — Option B: Anthropic API key
+> [!NOTE]
+> This option mounts your credentials file into the container. While mounted read-only, it means the agent inside has read access to your active session tokens.
 
-If you don't have a Pro plan, use a pay-per-token API key from [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys). Billed separately from claude.ai.
+### Claude — Option B: Anthropic API key — Recommended for maximum security / Zero-Trust
+
+If you don't have a Pro plan, or if you want to prevent any potential session token exposure, use a pay-per-token API key from [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys).
 
 ```bash
 make setup-claude-key
@@ -65,21 +68,26 @@ Saves your Antigravity API key and pulls the image automatically.
 
 All commands are run from the **repo root**. Point them at your project using `PROJECT=`. Relative paths, absolute paths, and `~` are all supported.
 
+### Claude CLI
+You can run Claude with auto-detection (prefers OAuth if found, otherwise falls back to API Key), or explicitly target a specific security profile:
+
 ```bash
-# relative path — resolved automatically
+# Auto-detect configuration
 make claude PROJECT=projects/my-app
+
+# Force OAuth authentication (Pro plan)
+make claude-oauth PROJECT=projects/my-app
+
+# Force API Key authentication (Zero-Trust / Highly Secure)
+make claude-key PROJECT=projects/my-app
+```
+
+### Antigravity CLI
+```bash
+# Run Antigravity CLI
 make antigravity PROJECT=projects/my-app
-
-# absolute path
-make claude PROJECT=/Users/you/work/client-api
-make antigravity PROJECT=/Users/you/work/client-api
-
-# home directory shorthand
-make claude PROJECT=~/work/client-api
-
-# defaults to current directory if PROJECT is omitted
-make claude
-make antigravity
+# or using the shortcut:
+make agy PROJECT=projects/my-app
 ```
 
 If the image isn't available locally, it will be pulled automatically before starting.
@@ -116,7 +124,7 @@ docker run -it --rm \
   ghcr.io/p9labs-io/claude-cli:latest
 ```
 
-**Claude with API key:**
+**Claude with API key (Zero-Trust):**
 ```bash
 docker run -it --rm \
   -v /absolute/path/to/my-app:/workspace \
@@ -153,7 +161,7 @@ docker run -it --rm \
 | `~/.ssh` | ❌ No |
 | `~/Documents`, `~/Downloads` | ❌ No |
 | Your environment variables | ❌ No (only what you pass explicitly) |
-| Your claude.ai credentials (OAuth) | ✅ Read-only, auth only |
+| Your credentials file (OAuth only) | ✅ Read-only (not mapped in API key mode) |
 
 ---
 
@@ -176,8 +184,11 @@ You are not in the repo root. `cd` into the `llm-sandbox` folder first.
 **`make setup-claude-oauth` says login may not have completed**
 Make sure you finished the browser login before typing `/exit`. Run `make setup-claude-oauth` again.
 
-**`make claude` says "No Claude credentials found"**
-Run either `make setup-claude-oauth` (Pro) or `make setup-claude-key` (API key).
+**`make claude-oauth` says "No credentials found"**
+Run `make setup-claude-oauth` (Pro plan) first.
+
+**`make claude-key` says "No ANTHROPIC_API_KEY found"**
+Run `make setup-claude-key` (API key) first.
 
 **`make antigravity` says "No ANTIGRAVITY_API_KEY found"**
 Run `make setup-antigravity` to save your key.
