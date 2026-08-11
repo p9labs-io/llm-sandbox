@@ -181,7 +181,7 @@ antigravity:
 	set -a; . $(ENV_FILE); set +a; \
 	docker run -it --rm \
 		--cap-drop=ALL \
-		--no-new-privileges \
+		--security-opt=no-new-privileges:true \
 		-v "$(ABS_PROJECT)":/workspace \
 		-e ANTIGRAVITY_API_KEY="$$ANTIGRAVITY_API_KEY" \
 		$(ANTIGRAVITY_IMAGE)
