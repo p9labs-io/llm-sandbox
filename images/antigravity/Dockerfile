@@ -14,7 +14,7 @@ ENV PATH="/home/antigravity/.local/bin:${PATH}"
 
 RUN curl -fsSL https://antigravity.google/cli/install.sh | bash
 
-# Create config directory and add settings.json to disable autoUpdate and terminal sandbox in container
+# Create config directory and add settings.json
 RUN mkdir -p /home/antigravity/.gemini/antigravity-cli
 COPY --chown=antigravity:antigravity settings.json /home/antigravity/.gemini/antigravity-cli/settings.json
 
