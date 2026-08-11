@@ -174,16 +174,12 @@ antigravity:
 	@if [ -z "$(ABS_PROJECT)" ]; then \
 		echo ""; echo "$(YELLOW)Project path not found: $(PROJECT)$(RESET)"; echo ""; exit 1; \
 	fi; \
-	docker image inspect $(ANTIGRAVITY_IMAGE) > /dev/null 2>&1 || docker pull $(ANTIGRAVITY_IMAGE); \
-	if [ ! -f $(ENV_FILE) ] || ! grep -q '^ANTIGRAVITY_API_KEY=' $(ENV_FILE); then \
-		echo "No ANTIGRAVITY_API_KEY found. Run 'make setup-antigravity' first."; exit 1; \
-	fi; \
-	set -a; . $(ENV_FILE); set +a; \
+	mkdir -p $(HOME)/.antigravity; \
 	docker run -it --rm \
 		--cap-drop=ALL \
 		--security-opt=no-new-privileges:true \
 		-v "$(ABS_PROJECT)":/workspace \
-		-e ANTIGRAVITY_API_KEY="$$ANTIGRAVITY_API_KEY" \
+		-v "$(HOME)/.antigravity":/home/antigravity/.gemini/antigravity-cli \
 		$(ANTIGRAVITY_IMAGE)
 
 agy: antigravity
