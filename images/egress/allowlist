@@ -1,0 +1,32 @@
+# Hosts the agent container is allowed to reach. Extended POSIX regexes, matched
+# against the destination hostname. Everything not listed here is refused.
+#
+# Edit this file and re-run `make egress-build egress-restart` to apply changes.
+
+# ── Claude Code: required ─────────────────────────────────────────────────────
+^api\.anthropic\.com$
+^platform\.claude\.com$
+^claude\.ai$
+^claude\.com$
+
+# ── Claude Code: optional but expected by parts of the CLI ────────────────────
+^downloads\.claude\.ai$
+^code\.claude\.com$
+^storage\.googleapis\.com$
+^raw\.githubusercontent\.com$
+
+# ── Developer tooling ─────────────────────────────────────────────────────────
+# Comment out anything you do not need. Each entry is a channel a compromised or
+# prompt-injected session could push data out through, so keep the list short.
+^registry\.npmjs\.org$
+^github\.com$
+^codeload\.github\.com$
+^objects\.githubusercontent\.com$
+^deb\.debian\.org$
+^pypi\.org$
+^files\.pythonhosted\.org$
+^proxy\.golang\.org$
+^sum\.golang\.org$
+^crates\.io$
+^static\.crates\.io$
+^index\.crates\.io$
