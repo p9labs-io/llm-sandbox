@@ -53,7 +53,10 @@ jobs:
             ghcr.io/${{ env.ORG }}/antigravity-cli:latest
             ghcr.io/${{ env.ORG }}/antigravity-cli:${{ github.sha }}
           no-cache: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # A distinct scope per image. type=gha defaults to scope=buildkit, which
+          # both workflows would share — each build overwriting the other's cache
+          # index, so the two images alternate between full hits and full misses.
+          cache-from: type=gha,scope=antigravity-cli
+          cache-to: type=gha,mode=max,scope=antigravity-cli
           provenance: true
           sbom: true
