@@ -24,6 +24,14 @@
 ^accounts\.google\.com$
 ^oauth2\.googleapis\.com$
 
+# ── Terraform / Ansible ───────────────────────────────────────────────────────
+# Provider and collection downloads. Many providers publish their binaries on
+# GitHub releases, so github.com and objects.githubusercontent.com below are part
+# of a working `terraform init` too. Drop this block if you do not use them.
+^registry\.terraform\.io$
+^releases\.hashicorp\.com$
+^galaxy\.ansible\.com$
+
 # ── Developer tooling ─────────────────────────────────────────────────────────
 # Comment out anything you do not need. Each entry is a channel a compromised or
 # prompt-injected session could push data out through, so keep the list short.

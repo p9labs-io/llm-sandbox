@@ -21,9 +21,10 @@ ENV_FILE     := $(HOME)/.env.ai-cli
 
 # The image bakes settings.json into the same directory the Makefile mounts over,
 # so the baked copy is hidden at runtime. Seed the host side instead.
+# Absolute, so the seed still works if make is invoked from outside the repo root.
 AGY_SETTINGS     := $(AGY_HOME)/settings.json
-AGY_TPL_ACCOUNT  := images/antigravity/settings.json
-AGY_TPL_GEMINI   := images/antigravity/settings.gemini.json
+AGY_TPL_ACCOUNT  := $(CURDIR)/images/antigravity/settings.json
+AGY_TPL_GEMINI   := $(CURDIR)/images/antigravity/settings.gemini.json
 
 # Expand a leading ~ before quoting, so paths containing spaces still work.
 PROJECT      ?= $(shell pwd)
