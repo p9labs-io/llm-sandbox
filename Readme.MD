@@ -22,7 +22,7 @@ The agent gets its own persistent config directory under `~/.llm-sandbox/`. Your
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
 - For Claude: a **Claude Pro/Max** account — or an **Anthropic API key** from [console.anthropic.com](https://console.anthropic.com)
-- For Antigravity: an **Antigravity API key** from [antigravity.google/docs/cli/reference](https://antigravity.google/docs/cli/reference)
+- For Antigravity: a Google account to sign in with, or a **Gemini API key** from [Google AI Studio](https://aistudio.google.com/apikey)
 
 ---
 
@@ -71,9 +71,22 @@ make setup-claude-oauth
 
 ### Antigravity
 
+Two ways in. A **Gemini API key** is the one that works cleanly in a container:
+
 ```bash
-make setup-antigravity
+make setup-antigravity     # then: make agy-key PROJECT=...
 ```
+
+The key is stored in `~/.env.ai-cli` as `GEMINI_API_KEY` and passed in as an
+environment variable. Antigravity ignores a key on its own — it also needs
+`"modelProvider": "gemini"` in its `settings.json`, which `make agy-key` seeds
+into `~/.llm-sandbox/antigravity/` on first run. It reads the key only from
+`GEMINI_API_KEY`; `GOOGLE_API_KEY` and `.env` files are ignored.
+
+**Browser sign-in** (`make agy`) also works, but the container has no OS keyring
+and no browser: the CLI prints a URL to open on your host, and you paste the
+resulting code back in. The session is stored in `~/.llm-sandbox/antigravity/`
+where the agent can read it — the same trade as `make claude-oauth`.
 
 ---
 
@@ -91,7 +104,8 @@ make claude-key   PROJECT=projects/my-app
 make claude-oauth PROJECT=projects/my-app
 
 # Antigravity
-make agy PROJECT=projects/my-app
+make agy     PROJECT=projects/my-app    # browser sign-in
+make agy-key PROJECT=projects/my-app    # GEMINI_API_KEY
 ```
 
 ### Restricting network egress
@@ -103,6 +117,8 @@ make claude-key PROJECT=projects/my-app LOCK=1
 ```
 
 The allowlist lives in [`images/egress/allowlist`](images/egress/allowlist). Edit it and run `make egress-restart` to apply. `make egress-down` removes the proxy and its networks.
+
+Antigravity needs `generativelanguage.googleapis.com` for model requests, plus `accounts.google.com` and `oauth2.googleapis.com` if you use browser sign-in rather than a key. All four are in the default list; drop the sign-in pair if you only ever use `make agy-key`.
 
 This is what makes `--dangerously-skip-permissions` a defensible trade rather than a reckless one: with egress pinned to hosts you chose, a bypassed session can still wreck the mounted workspace, but it has nowhere to send what it read.
 
@@ -139,6 +155,20 @@ docker run -it --rm \
 ```
 
 Swap `-e ANTHROPIC_API_KEY=...` for `-e CLAUDE_CODE_OAUTH_TOKEN=...`, or drop it entirely if `~/.llm-sandbox/claude/.credentials.json` already holds a login.
+
+For Antigravity, note that mounting the config directory **hides** the `settings.json` baked into the image, so put one on the host first:
+
+```bash
+cp images/antigravity/settings.gemini.json "$HOME/.llm-sandbox/antigravity/settings.json"
+
+docker run -it --rm \
+  --init --cap-drop=ALL --security-opt=no-new-privileges:true \
+  --pids-limit=512 --memory=4g --cpus=4 \
+  -v /absolute/path/to/my-app:/workspace \
+  -v "$HOME/.llm-sandbox/antigravity":/home/antigravity/.gemini/antigravity-cli \
+  -e GEMINI_API_KEY="your-key-here" \
+  ghcr.io/p9labs-io/antigravity-cli:latest
+```
 
 ### What each flag does
 
@@ -179,6 +209,7 @@ What this actually protects against, and what it doesn't.
 - **Prompt injection.** A hostile `README`, dependency, or issue body can steer the agent. The container limits the blast radius; it does not limit the agent's willingness to be steered.
 - **Whatever the allowlist allows.** `github.com` and `registry.npmjs.org` are in the default allowlist because real work needs them, and both are usable as exfiltration channels by anything holding a token. Trim the list to what your project actually needs.
 - **Container escape.** Rare, but the boundary is the Docker daemon. On macOS there is an additional VM boundary; on Linux there is not.
+- **The Antigravity install.** The Claude image verifies its binary against a signed manifest; Antigravity publishes no equivalent, so that image trusts whatever `antigravity.google/cli/install.sh` serves at build time.
 
 ---
 
@@ -190,7 +221,9 @@ What this actually protects against, and what it doesn't.
 | `ghcr.io/p9labs-io/antigravity-cli` | `debian:bookworm-slim` | `linux/amd64`, `linux/arm64` | `antigravity` (non-root) |
 | `llm-sandbox/egress-proxy` (built locally) | `debian:bookworm-slim` | host arch | `tinyproxy` (non-root) |
 
-The Claude image installs from the `stable` channel and then verifies the installed binary's SHA-256 against Anthropic's GPG-signed release manifest (key fingerprint `31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE`), so a tampered installer fails the build instead of shipping. In-container auto-update is disabled, which means the image is the only thing that decides which version runs — run `make pull` to move forward.
+The Claude image installs from the `stable` channel and then verifies the installed binary's SHA-256 against Anthropic's GPG-signed release manifest (key fingerprint `31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE`), so a tampered installer fails the build instead of shipping. `DISABLE_UPDATES=1` then blocks both the background updater and a manual `claude update`, so the image is the only thing that decides which version runs — run `make pull` to move forward. The Antigravity image has no signed manifest to check against and no equivalent update switch.
+
+Telemetry and error reporting are off in the Claude image. `DISABLE_TELEMETRY` also turns off feature-flag fetching, so anything that depends on it — Remote Control among others — is unavailable; drop those two `ENV` lines from `images/claude/Dockerfile` and rebuild if you want them.
 
 Images are published to [GitHub Container Registry](https://github.com/orgs/p9labs-io/packages) and rebuilt weekly and on Dockerfile changes.
 
@@ -207,8 +240,17 @@ Make sure you finished the browser login before typing `/exit`. Run it again.
 **`Refusing to mount ...`**
 `PROJECT` resolved to your home directory or `/`. Point it at a single project directory.
 
+**Antigravity exits at startup saying `GEMINI_API_KEY` is not set**
+`~/.llm-sandbox/antigravity/settings.json` has `"modelProvider": "gemini"` but no key is in the environment. Run `make setup-antigravity`, or delete that line to go back to browser sign-in.
+
+**Antigravity ignores my key and asks me to sign in**
+The same file is missing `"modelProvider": "gemini"`. Delete `~/.llm-sandbox/antigravity/settings.json` and run `make agy-key` to reseed it.
+
 **Requests hang or fail with `LOCK=1`**
 A host is missing from `images/egress/allowlist`. Check the proxy log with `docker logs llm-sandbox-proxy`, add the host, and run `make egress-restart`.
+
+**I had `ANTIGRAVITY_API_KEY` set and it stopped working**
+It never did anything — the CLI reads `GEMINI_API_KEY` only. Run `make setup-antigravity` and delete the old line from `~/.env.ai-cli`.
 
 **I upgraded and my old login is gone**
 The sandbox config directory moved from `~/.claude` to `~/.llm-sandbox/claude` so the container no longer touches your host Claude Code config. Re-run a setup command, or move the old file:

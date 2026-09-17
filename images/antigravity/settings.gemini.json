@@ -1,4 +1,5 @@
 {
+  "modelProvider": "gemini",
   "enableTerminalSandbox": false,
   "enableTelemetry": false,
   "showFeedbackSurvey": false

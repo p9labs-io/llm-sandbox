@@ -1,7 +1,7 @@
 # Hosts the agent container is allowed to reach. Extended POSIX regexes, matched
 # against the destination hostname. Everything not listed here is refused.
 #
-# Edit this file and re-run `make egress-build egress-restart` to apply changes.
+# Edit this file and re-run `make egress-restart` to apply changes.
 
 # ── Claude Code: required ─────────────────────────────────────────────────────
 ^api\.anthropic\.com$
@@ -14,6 +14,15 @@
 ^code\.claude\.com$
 ^storage\.googleapis\.com$
 ^raw\.githubusercontent\.com$
+
+# ── Antigravity CLI ───────────────────────────────────────────────────────────
+# generativelanguage.googleapis.com carries model requests when modelProvider is
+# "gemini". The accounts/oauth2 hosts are only needed for the browser sign-in
+# flow — drop them if you authenticate with GEMINI_API_KEY.
+^antigravity\.google$
+^generativelanguage\.googleapis\.com$
+^accounts\.google\.com$
+^oauth2\.googleapis\.com$
 
 # ── Developer tooling ─────────────────────────────────────────────────────────
 # Comment out anything you do not need. Each entry is a channel a compromised or

@@ -48,17 +48,20 @@ RUN set -eu; \
     echo "verified claude $version ($plat) against signed manifest"; \
     rm -rf "$tmp" "$HOME/.gnupg"
 
-# Auto-update would silently replace the binary verified above at runtime, so the
+# An update would silently replace the binary verified above at runtime, so the
 # image is the only thing that decides which version runs. Refresh with `make pull`.
-ENV DISABLE_AUTOUPDATER=1
+# DISABLE_UPDATES is the strict form: DISABLE_AUTOUPDATER alone stops only the
+# background updater and leaves `claude update` able to overwrite the binary.
+ENV DISABLE_UPDATES=1
 
 # Keep ~/.claude.json (OAuth session, project trust, API-key approval) inside the
 # mounted config directory instead of the ephemeral container filesystem — without
 # this you re-approve the API key and re-trust the workspace on every run.
 ENV CLAUDE_CONFIG_DIR=/home/claude/.claude
 
-# Optional operational telemetry / error reporting to Datadog. Off by default here;
-# remove these lines if you want them.
+# Telemetry and error reporting off. Note that DISABLE_TELEMETRY also turns off
+# feature-flag fetching, so features that depend on it (Remote Control among them)
+# are unavailable in this image. Unset both lines if you want them back.
 ENV DISABLE_TELEMETRY=1
 ENV DISABLE_ERROR_REPORTING=1
 
