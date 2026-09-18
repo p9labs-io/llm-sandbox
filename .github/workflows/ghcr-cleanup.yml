@@ -28,7 +28,7 @@ jobs:
       contents: read
     steps:
       - name: Clean Antigravity CLI package
-        uses: dataaxiom/ghcr-cleanup-action@v1
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f  # v1.2.2
         with:
           package: antigravity-cli
           # Keep newest tagged digests; always preserve :latest
@@ -38,7 +38,7 @@ jobs:
           delete-orphaned-images: "true"
 
       - name: Clean Claude CLI package
-        uses: dataaxiom/ghcr-cleanup-action@v1
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f  # v1.2.2
         with:
           package: claude-cli
           # Keep newest tagged digests; always preserve :latest

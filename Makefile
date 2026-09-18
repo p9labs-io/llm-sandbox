@@ -19,6 +19,13 @@ AGY_HOME     := $(SANDBOX_HOME)/antigravity
 CLAUDE_CREDS := $(CLAUDE_HOME)/.credentials.json
 ENV_FILE     := $(HOME)/.env.ai-cli
 
+# The image bakes settings.json into the same directory the Makefile mounts over,
+# so the baked copy is hidden at runtime. Seed the host side instead.
+# Absolute, so the seed still works if make is invoked from outside the repo root.
+AGY_SETTINGS     := $(AGY_HOME)/settings.json
+AGY_TPL_ACCOUNT  := $(CURDIR)/images/antigravity/settings.json
+AGY_TPL_GEMINI   := $(CURDIR)/images/antigravity/settings.gemini.json
+
 # Expand a leading ~ before quoting, so paths containing spaces still work.
 PROJECT      ?= $(shell pwd)
 PROJECT_EXP  := $(patsubst ~%,$(HOME)%,$(PROJECT))
@@ -59,7 +66,8 @@ endif
 
 .PHONY: help setup setup-claude setup-claude-token setup-claude-key setup-claude-oauth \
 	setup-antigravity pull pull-claude pull-antigravity claude claude-token claude-key \
-	claude-oauth claude-shell antigravity agy egress-build egress-up egress-down egress-restart
+	claude-oauth claude-shell antigravity agy agy-key antigravity-key \
+	egress-build egress-up egress-down egress-restart
 
 help:
 	@echo ""
@@ -69,7 +77,7 @@ help:
 	@echo "  $(CYAN)make setup-claude-token$(RESET)  Pro/Max plan, scoped long-lived token (recommended)"
 	@echo "  $(CYAN)make setup-claude-key$(RESET)    Anthropic API key (pay-per-token, revocable)"
 	@echo "  $(CYAN)make setup-claude-oauth$(RESET)  Full OAuth login stored in the sandbox (least isolated)"
-	@echo "  $(CYAN)make setup-antigravity$(RESET)   Save Antigravity API key"
+	@echo "  $(CYAN)make setup-antigravity$(RESET)   Save a Gemini API key for Antigravity"
 	@echo ""
 	@echo "  Run:"
 	@echo "  $(CYAN)make claude$(RESET)              Run Claude CLI (auto-detects auth)"
@@ -77,7 +85,8 @@ help:
 	@echo "  $(CYAN)make claude-key$(RESET)          Force ANTHROPIC_API_KEY"
 	@echo "  $(CYAN)make claude-oauth$(RESET)        Force stored OAuth login"
 	@echo "  $(CYAN)make claude-shell$(RESET)        Shell in the Claude image (debugging)"
-	@echo "  $(CYAN)make antigravity$(RESET)         Run Antigravity CLI"
+	@echo "  $(CYAN)make antigravity$(RESET)         Run Antigravity CLI (browser sign-in)"
+	@echo "  $(CYAN)make agy-key$(RESET)             Run Antigravity CLI with GEMINI_API_KEY"
 	@echo "  $(CYAN)make agy$(RESET)                 Alias for make antigravity"
 	@echo ""
 	@echo "  Options:"
@@ -87,7 +96,10 @@ help:
 	@echo ""
 	@echo "  Maintenance:"
 	@echo "  $(CYAN)make pull$(RESET)                Pull latest Claude and Antigravity images"
+	@echo "  $(CYAN)make pull-claude$(RESET)         Pull the Claude image only"
+	@echo "  $(CYAN)make pull-antigravity$(RESET)    Pull the Antigravity image only"
 	@echo "  $(CYAN)make egress-build$(RESET)        Build the allowlist proxy image"
+	@echo "  $(CYAN)make egress-restart$(RESET)      Rebuild and restart the proxy (apply allowlist edits)"
 	@echo "  $(CYAN)make egress-down$(RESET)         Stop and remove the proxy and its networks"
 	@echo ""
 
@@ -173,14 +185,20 @@ setup-claude-oauth:
 
 setup-claude: setup-claude-token
 
+# Antigravity reads the key only from GEMINI_API_KEY, and only when settings.json
+# also sets "modelProvider": "gemini". GOOGLE_API_KEY and .env files are ignored.
+# See antigravity.google/docs/cli/installation-and-auth.
 setup-antigravity:
 	@echo ""
-	@echo "$(BOLD)Setup — Antigravity API key$(RESET)"
-	@echo "  (antigravity.google/docs/cli/reference)"
+	@echo "$(BOLD)Setup — Gemini API key for Antigravity$(RESET)"
 	@echo ""
-	@$(call read_secret,ANTIGRAVITY_API_KEY,Antigravity API key)
+	@echo "Create a key at aistudio.google.com/apikey. Model requests go straight to"
+	@echo "the Gemini API and the CLI never opens an account session — which is what"
+	@echo "makes it usable in a container with no browser and no OS keyring."
+	@echo ""
+	@$(call read_secret,GEMINI_API_KEY,Gemini API key)
 	@docker pull $(ANTIGRAVITY_IMAGE)
-	@echo "$(GREEN)✓ Ready. Run: make antigravity PROJECT=path/to/app$(RESET)"
+	@echo "$(GREEN)✓ Ready. Run: make agy-key PROJECT=path/to/app$(RESET)"
 
 setup: setup-claude-token setup-antigravity
 
@@ -274,23 +292,62 @@ claude:
 # Shell inside the image with no credentials attached, for debugging the sandbox.
 claude-shell: $(NET_DEP)
 	@$(GUARD_PROJECT); \
+	docker image inspect $(CLAUDE_IMAGE) > /dev/null 2>&1 || docker pull $(CLAUDE_IMAGE); \
+	echo "$(NET_LABEL)"; \
 	docker run -it --rm $(HARDEN) $(NET_FLAGS) \
 		-v "$(ABS_PROJECT)":/workspace \
 		--entrypoint /bin/bash $(CLAUDE_IMAGE)
 
-antigravity: $(NET_DEP)
-	@$(GUARD_PROJECT); \
+# $(1) is the settings template to seed ~/.llm-sandbox/antigravity/settings.json
+# with on first run. The mount hides the copy baked into the image, so without
+# this seed the CLI runs on stock defaults — terminal sandbox on, telemetry on,
+# and no modelProvider.
+define prep_agy
+	$(GUARD_PROJECT); \
 	docker image inspect $(ANTIGRAVITY_IMAGE) > /dev/null 2>&1 || docker pull $(ANTIGRAVITY_IMAGE); \
 	mkdir -p "$(AGY_HOME)"; chmod 700 "$(SANDBOX_HOME)" "$(AGY_HOME)"; \
-	echo "$(NET_LABEL)"; \
-	KEYFLAG=""; \
-	if [ -f "$(ENV_FILE)" ] && grep -q '^ANTIGRAVITY_API_KEY=' "$(ENV_FILE)"; then \
-		set -a; . "$(ENV_FILE)"; set +a; \
-		KEYFLAG="-e ANTIGRAVITY_API_KEY"; \
+	if [ ! -f "$(AGY_SETTINGS)" ]; then \
+		cp "$(1)" "$(AGY_SETTINGS)"; \
+		echo "$(GREEN)✓ Seeded $(AGY_SETTINGS) from $(1)$(RESET)"; \
 	fi; \
-	docker run -it --rm $(HARDEN) $(NET_FLAGS) $$KEYFLAG \
-		-v "$(ABS_PROJECT)":/workspace \
-		-v "$(AGY_HOME)":/home/antigravity/.gemini/antigravity-cli \
-		$(ANTIGRAVITY_IMAGE)
+	if [ -f "$(ENV_FILE)" ] && grep -q '^ANTIGRAVITY_API_KEY=' "$(ENV_FILE)"; then \
+		echo "$(YELLOW)Note: ANTIGRAVITY_API_KEY in $(ENV_FILE) is ignored — the CLI reads$(RESET)"; \
+		echo "$(YELLOW)GEMINI_API_KEY only. Run 'make setup-antigravity' and delete the old line.$(RESET)"; \
+	fi; \
+	echo "$(NET_LABEL)"
+endef
+
+AGY_RUN = docker run -it --rm $(HARDEN) $(NET_FLAGS) \
+	-v "$(ABS_PROJECT)":/workspace \
+	-v "$(AGY_HOME)":/home/antigravity/.gemini/antigravity-cli
+
+# Browser sign-in. The container has no keyring and no browser, so the CLI falls
+# back to printing a URL to open on the host and paste a code back.
+antigravity: $(NET_DEP)
+	@$(call prep_agy,$(AGY_TPL_ACCOUNT)); \
+	if grep -q '"modelProvider"' "$(AGY_SETTINGS)" 2>/dev/null; then \
+		echo "$(YELLOW)$(AGY_SETTINGS) sets modelProvider — the CLI will refuse to start$(RESET)"; \
+		echo "$(YELLOW)without GEMINI_API_KEY. Use 'make agy-key', or remove that line.$(RESET)"; \
+		exit 1; \
+	fi; \
+	echo "$(GREEN)Auth: browser sign-in$(RESET)"; \
+	$(AGY_RUN) $(ANTIGRAVITY_IMAGE)
+
+# Gemini API key. Needs both the environment variable and "modelProvider": "gemini"
+# in settings.json — the key on its own has no effect.
+antigravity-key: $(NET_DEP)
+	@$(call prep_agy,$(AGY_TPL_GEMINI)); \
+	if [ ! -f "$(ENV_FILE)" ] || ! grep -q '^GEMINI_API_KEY=' "$(ENV_FILE)"; then \
+		echo "$(YELLOW)No GEMINI_API_KEY found. Run 'make setup-antigravity' first.$(RESET)"; exit 1; \
+	fi; \
+	if ! grep -q '"modelProvider"' "$(AGY_SETTINGS)" 2>/dev/null; then \
+		echo "$(YELLOW)$(AGY_SETTINGS) has no modelProvider, so the key would be ignored.$(RESET)"; \
+		echo "$(YELLOW)Add \"modelProvider\": \"gemini\" to it, or delete the file to reseed.$(RESET)"; \
+		exit 1; \
+	fi; \
+	echo "$(GREEN)Auth: Gemini API key (no account session)$(RESET)"; \
+	set -a; . "$(ENV_FILE)"; set +a; \
+	$(AGY_RUN) -e GEMINI_API_KEY $(ANTIGRAVITY_IMAGE)
 
 agy: antigravity
+agy-key: antigravity-key
